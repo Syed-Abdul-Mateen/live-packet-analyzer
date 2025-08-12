@@ -67,7 +67,7 @@ live-packet-analyzer/
 
 ```powershell
 # 1) Clone your repo
-git clone https://github.com/<your-username>/live-packet-analyzer.git
+git clone https://github.com/syed-abdul-mateen/live-packet-analyzer.git
 cd live-packet-analyzer
 
 # 2) Create & activate a virtual environment
