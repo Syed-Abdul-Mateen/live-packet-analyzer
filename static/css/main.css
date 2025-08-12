@@ -1,0 +1,218 @@
+/* main.css — Live Packet Analyzer UI (dark, modern, responsive) */
+/* -- Design tokens -------------------------------------------------------- */
+:root{
+  --bg: #0b1220;
+  --bg-accent: radial-gradient(1200px 600px at 80% -10%, rgba(59,130,246,.12), transparent 60%),
+               radial-gradient(900px 500px at -10% 10%, rgba(34,197,94,.10), transparent 60%);
+  --panel: #0f172a;            /* slate-900 */
+  --panel-2: #111827;          /* near black */
+  --line: #1f2a44;             /* slate-800 */
+  --muted: #94a3b8;            /* slate-400 */
+  --text: #e2e8f0;             /* slate-200 */
+  --text-dim: #cbd5e1;         /* slate-300 */
+
+  --primary: #3b82f6;          /* blue-500 */
+  --safe: #22c55e;             /* green-500 */
+  --susp: #f59e0b;             /* amber-500 */
+  --mal:  #ef4444;             /* red-500 */
+
+  --chip-total: #60a5fa;       /* blue-400 */
+  --chip-safe:  #34d399;       /* green-400 */
+  --chip-susp:  #fbbf24;       /* amber-400 */
+  --chip-mal:   #f87171;       /* red-400 */
+
+  --radius-lg: 18px;
+  --radius-md: 14px;
+  --shadow-1: 0 8px 24px rgba(2,6,23,.35);
+  --shadow-2: 0 2px 0 rgba(255,255,255,.02) inset, 0 1px 0 rgba(15,23,42,.5);
+}
+
+/* -- Base ----------------------------------------------------------------- */
+*{ box-sizing: border-box; }
+html, body{ height:100%; }
+body{
+  margin:0;
+  color: var(--text);
+  background: var(--bg);
+  background-image: var(--bg-accent);
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+
+/* -- Topbar --------------------------------------------------------------- */
+.topbar{
+  position: sticky; top:0; z-index: 5;
+  display:flex; align-items:center; justify-content: space-between;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, rgba(15,23,42,.95), rgba(15,23,42,.75));
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+.brand{
+  font-weight: 800; letter-spacing:.3px;
+  font-size: 18px;
+}
+.badges{ display:flex; gap:8px; flex-wrap: wrap; }
+.badge{
+  background: #0b1220;
+  border:1px solid var(--line);
+  color: var(--text-dim);
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* -- Layout --------------------------------------------------------------- */
+.container{
+  max-width: 1200px;
+  margin: 18px auto 60px;
+  padding: 0 16px;
+}
+
+/* Toolbar */
+.toolbar{ margin-bottom: 14px; }
+.btn-group{ display:flex; flex-wrap: wrap; gap:10px; }
+
+/* -- Buttons -------------------------------------------------------------- */
+.btn{
+  appearance: none; border: none; cursor: pointer;
+  padding: 10px 14px; border-radius: 12px;
+  font-weight: 700; letter-spacing:.2px;
+  color: #0b1220;
+  box-shadow: var(--shadow-2);
+  transition: transform .08s ease, filter .15s ease, opacity .2s ease;
+  outline: none;
+}
+.btn:active{ transform: translateY(1px) scale(.99); }
+.btn:hover{ filter: brightness(1.07); }
+.btn.disabled, .btn:disabled{ opacity:.55; pointer-events:none; }
+
+/* Variants */
+.btn-all{ background: var(--primary); }
+.btn-safe{ background: var(--safe); }
+.btn-suspicious{ background: var(--susp); }
+.btn-malicious{ background: var(--mal); }
+.btn-sound{
+  background: #e5e7eb; color:#0b1220;
+}
+
+/* -- Grid utilities ------------------------------------------------------- */
+.grid{ display:grid; gap:14px; }
+.grid-4{ grid-template-columns: repeat(4, 1fr); }
+.grid-2{ grid-template-columns: repeat(2, 1fr); }
+
+@media (max-width: 1100px){
+  .grid-4{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px){
+  .grid-4, .grid-2{ grid-template-columns: 1fr; }
+}
+
+/* -- Cards ---------------------------------------------------------------- */
+.card{
+  background: linear-gradient(180deg, rgba(17,24,39,.85), rgba(11,18,32,.85));
+  border:1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: 14px;
+}
+.card-title{
+  font-weight: 800; letter-spacing:.2px;
+  color: var(--text);
+  margin: 2px 2px 10px;
+}
+
+/* -- Stat tiles ----------------------------------------------------------- */
+.stat{ display:flex; align-items:center; gap:10px; }
+.stat-label{ color: var(--muted); font-weight:700; font-size:12px; text-transform: uppercase; letter-spacing:.7px;}
+.stat-value{ font-size: 26px; font-weight: 900; }
+
+/* Dots */
+.dot{
+  width:14px; height:14px; border-radius:999px; flex:0 0 14px;
+  box-shadow: 0 0 0 4px rgba(255,255,255,.03) inset, 0 0 0 2px rgba(255,255,255,.02) inset;
+  animation: throb 1.8s ease-in-out infinite;
+}
+.dot-safe{ background: var(--safe); }
+.dot-suspicious{ background: var(--susp); animation-duration:1.2s; }
+.dot-malicious{ background: var(--mal); animation-duration:.9s; }
+@keyframes throb{
+  0%,100%{ transform: scale(1); opacity: .95;}
+  50%{ transform: scale(1.08); opacity: 1;}
+}
+
+/* -- Charts --------------------------------------------------------------- */
+.chart-box{
+  width:100%;
+  min-height: 260px;
+  background: rgba(2,6,23,.25);
+  border:1px dashed var(--line);
+  border-radius: 14px;
+  padding:10px;
+}
+.legend{
+  display:flex; gap:14px; align-items:center; flex-wrap: wrap;
+  color: var(--muted); font-weight:700; font-size:12px; margin-top:10px;
+}
+.chip{
+  display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.05) inset;
+  transform: translateY(1px);
+}
+.chip-total{ background: var(--chip-total); }
+.chip-safe{ background: var(--chip-safe); }
+.chip-suspicious{ background: var(--chip-susp); }
+.chip-malicious{ background: var(--chip-mal); }
+
+/* -- Table ---------------------------------------------------------------- */
+.table-wrap{
+  border:1px solid var(--line); border-radius: 14px; overflow: hidden;
+  background: rgba(2,6,23,.25);
+  max-height: 360px; overflow: auto;
+}
+table{ width:100%; border-collapse: separate; border-spacing:0; }
+thead th{
+  position: sticky; top:0; z-index:1;
+  text-align:left; font-size:12px; color:#c7d2fe; /* indigo-200 */
+  text-transform: uppercase; letter-spacing:.6px;
+  background: linear-gradient(180deg, rgba(15,23,42,.95), rgba(15,23,42,.8));
+  border-bottom:1px solid var(--line);
+  padding:10px 10px;
+}
+tbody td{
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(30,41,59,.55);
+  color: var(--text-dim);
+  font-weight: 600;
+}
+tbody tr:nth-child(even){ background: rgba(2,6,23,.18); }
+tbody tr:hover{ background: rgba(59,130,246,.10); }
+
+/* Label pills used in the table */
+.pill{
+  display:inline-block; padding:2px 8px; border-radius:999px;
+  font-weight:800; font-size:12px;
+  border:1px solid rgba(2,6,23,.12);
+}
+.pill-safe{ background:#dcfce7; color:#166534; }
+.pill-suspicious{ background:#fff3d6; color:#b45309; }
+.pill-malicious{ background:#ffe5e7; color:#b91c1c; }
+
+/* -- Map ------------------------------------------------------------------ */
+#map{
+  border-radius: 14px; border:1px solid var(--line);
+  overflow: hidden;
+}
+
+/* -- Utility -------------------------------------------------------------- */
+.badge + .badge{ margin-left: 4px; }
+.btn-sound{ margin-left:.5rem; }
+
+/* Scrollbars (WebKit/Chromium) */
+.table-wrap::-webkit-scrollbar{ height:12px; width:12px; }
+.table-wrap::-webkit-scrollbar-thumb{ background:#1f2a44; border-radius: 12px; border:3px solid rgba(0,0,0,0); background-clip: padding-box; }
+.table-wrap::-webkit-scrollbar-track{ background: rgba(2,6,23,.25); }
+
+/* Reduce motion if user prefers */
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition: none !important; }
+}

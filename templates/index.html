@@ -1,0 +1,295 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Live Packet Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .toolbar .btn-sound { margin-left: .5rem; }
+    .pill { padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+    .pill-safe { background:#dcfce7; color:#166534; }
+    .pill-suspicious { background:#fff3d6; color:#b45309; }
+    .pill-malicious { background:#ffe5e7; color:#b91c1c; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Live Packet Analyzer</div>
+    <div class="badges">
+      <span class="badge">iface: {{ iface }}</span>
+      <span class="badge">bpf: {{ bpf }}</span>
+      <span class="badge">Siren: <span id="sirenMode">-</span></span>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="toolbar">
+      <div class="btn-group">
+        <button class="btn btn-all"        onclick="exportPdf('all')">PDF: All Logs</button>
+        <button class="btn btn-safe"       onclick="exportPdf('safe')">PDF: Safe</button>
+        <button class="btn btn-suspicious" onclick="exportPdf('suspicious')">PDF: Suspicious</button>
+        <button class="btn btn-malicious"  onclick="exportPdf('malicious')">PDF: Malicious</button>
+        <button id="enableSound" class="btn btn-sound">🔊 Enable Sound</button>
+      </div>
+    </section>
+
+    <section class="grid grid-4">
+      <div class="card stat">
+        <div class="stat-label">Total</div>
+        <div class="stat-value" id="statTotal">0</div>
+      </div>
+      <div class="card stat">
+        <div class="dot dot-safe"></div>
+        <div>
+          <div class="stat-label">Safe</div>
+          <div class="stat-value" id="statSafe">0</div>
+        </div>
+      </div>
+      <div class="card stat">
+        <div class="dot dot-suspicious"></div>
+        <div>
+          <div class="stat-label">Suspicious</div>
+          <div class="stat-value" id="statSuspicious">0</div>
+        </div>
+      </div>
+      <div class="card stat">
+        <div class="dot dot-malicious"></div>
+        <div>
+          <div class="stat-label">Malicious</div>
+          <div class="stat-value" id="statMalicious">0</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Traffic over time (last 3 min)</div>
+        <div class="chart-box"><canvas id="trafficChart"></canvas></div>
+        <div class="legend">
+          <span><span class="chip chip-total"></span>Total</span>
+          <span><span class="chip chip-safe"></span>Safe</span>
+          <span><span class="chip chip-suspicious"></span>Suspicious</span>
+          <span><span class="chip chip-malicious"></span>Malicious</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Distribution</div>
+        <div class="chart-box"><canvas id="distChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Recent Packets</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th><th>Src</th><th>Dst</th><th>Proto</th><th>SP</th><th>DP</th><th>Len</th><th>Label</th><th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="pktBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Alerts (geo scatter)</div>
+        <div id="map" style="height: 360px;"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // -------- Colors ----------
+    const COLORS = {
+      total:   '#3b82f6', // blue
+      safe:    '#22c55e', // green
+      susp:    '#f59e0b', // amber
+      mal:     '#ef4444', // red
+      grid:    'rgba(148,163,184,.15)',
+      text:    'rgba(226,232,240,.9)',
+    };
+
+    // -------- PDF Export ----------
+    function exportPdf(filter){
+      window.open('/api/export?filter=' + encodeURIComponent(filter), '_blank');
+    }
+
+    // -------- Map ----------
+    const map = L.map('map', {zoomControl:true}).setView([22.5,79], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    let markers = [];
+
+    // -------- Charts ----------
+    const trafficCtx = document.getElementById('trafficChart');
+    const trafficChart = new Chart(trafficCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Total', data: [], borderColor: COLORS.total, tension:.35, pointRadius:0, borderWidth:2 },
+          { label: 'Safe', data: [], borderColor: COLORS.safe, tension:.35, pointRadius:0, borderWidth:1.8 },
+          { label: 'Suspicious', data: [], borderColor: COLORS.susp, tension:.35, pointRadius:0, borderWidth:1.8 },
+          { label: 'Malicious', data: [], borderColor: COLORS.mal, tension:.35, pointRadius:0, borderWidth:1.8 },
+        ]
+      },
+      options: {
+        responsive:true,
+        maintainAspectRatio:true,
+        aspectRatio: 16/6,
+        animations:false,
+        scales: {
+          x: { ticks: { color: COLORS.text, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid: { color: COLORS.grid }},
+          y: { ticks: { color: COLORS.text }, grid: { color: COLORS.grid }, beginAtZero:true, suggestedMax: 8 }
+        },
+        plugins: { legend: { display:false }, tooltip: { mode:'index', intersect:false } }
+      }
+    });
+
+    const distCtx = document.getElementById('distChart');
+    const distChart = new Chart(distCtx, {
+      type: 'doughnut',
+      data: { labels: ['Safe','Suspicious','Malicious'], datasets: [{ data:[0,0,0], backgroundColor:['#22c55e','#f59e0b','#ef4444'] }] },
+      options: { responsive:true, maintainAspectRatio:true, aspectRatio: 1.3, plugins: { legend: { labels: { color: COLORS.text } } } }
+    });
+
+    function labelClass(l){
+      if(l==='malicious') return 'pill pill-malicious';
+      if(l==='suspicious') return 'pill pill-suspicious';
+      return 'pill pill-safe';
+    }
+
+    function updateTraffic(series){
+      trafficChart.data.labels = series.labels;
+      trafficChart.data.datasets[0].data = series.total;
+      trafficChart.data.datasets[1].data = series.safe;
+      trafficChart.data.datasets[2].data = series.suspicious;
+      trafficChart.data.datasets[3].data = series.malicious;
+      trafficChart.update('none');
+    }
+
+    function updateCounts(c){
+      document.getElementById('statTotal').textContent = c.total;
+      document.getElementById('statSafe').textContent = c.safe;
+      document.getElementById('statSuspicious').textContent = c.suspicious;
+      document.getElementById('statMalicious').textContent = c.malicious;
+      distChart.data.datasets[0].data = [c.safe, c.suspicious, c.malicious];
+      distChart.update('none');
+    }
+
+    // -------- Siren Audio using YOUR MP3s ----------
+    // Files must exist at:
+    //   /assets/sounds/suspicious_beep.mp3
+    //   /assets/sounds/high_danger.mp3
+    const SFX = {
+      suspicious: new Audio('/assets/sounds/suspicious_beep.mp3'),
+      high:       new Audio('/assets/sounds/high_danger.mp3')
+    };
+    SFX.suspicious.volume = 1.0;
+    SFX.high.volume = 1.0;
+    SFX.high.loop = true; // high danger continuous
+
+    let soundEnabled = false;
+    let beepTimer = null;
+    let currentMode = 'safe';
+
+    function stopAllAudio(){
+      if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+      Object.values(SFX).forEach(a => { try { a.pause(); a.currentTime = 0; } catch(e){} });
+    }
+
+    async function enableSoundOnce(){
+      if (soundEnabled) return;
+      try {
+        // quick unlock: play+pause a tiny snippet
+        await SFX.suspicious.play();
+        SFX.suspicious.pause();
+        SFX.suspicious.currentTime = 0;
+        soundEnabled = true;
+        const btn = document.getElementById('enableSound');
+        btn.textContent = '🔊 Sound On';
+        btn.disabled = true;
+        btn.classList.add('disabled');
+      } catch(e){
+        console.warn('Autoplay unlock failed, user interaction needed.', e);
+      }
+    }
+
+    document.getElementById('enableSound').addEventListener('click', enableSoundOnce);
+
+    function setSiren(mode){
+      if (!soundEnabled) return;
+      if (mode === currentMode) return;
+
+      stopAllAudio();
+
+      if (mode === 'suspicious') {
+        // periodic beep every 2 seconds
+        beepTimer = setInterval(() => {
+          SFX.suspicious.currentTime = 0;
+          SFX.suspicious.play().catch(()=>{});
+        }, 2000);
+      } else if (mode === 'high') {
+        // continuous loud siren
+        SFX.high.currentTime = 0;
+        SFX.high.play().catch(()=>{});
+      } // safe => nothing playing
+
+      currentMode = mode;
+    }
+
+    // -------- Polling / UI refresh ----------
+    async function refresh(){
+      try{
+        const [stats, pkts, alerts, siren] = await Promise.all([
+          fetch('/api/stats').then(r=>r.json()),
+          fetch('/api/packets').then(r=>r.json()),
+          fetch('/api/alerts').then(r=>r.json()),
+          fetch('/api/siren').then(r=>r.json())
+        ]);
+
+        document.getElementById('sirenMode').textContent = siren.mode || '-';
+        updateTraffic(stats.series);
+        updateCounts(stats.counts);
+
+        const body = document.getElementById('pktBody');
+        body.innerHTML = pkts.slice(-200).reverse().map(p => `
+          <tr>
+            <td>${p.ts||''}</td>
+            <td>${p.src||''}</td>
+            <td>${p.dst||''}</td>
+            <td>${p.proto||''}</td>
+            <td>${p.sport||''}</td>
+            <td>${p.dport||''}</td>
+            <td>${p.length||''}</td>
+            <td><span class="${labelClass((p.label||'').toLowerCase())}">${(p.label||'')}</span></td>
+            <td>${p.score ?? ''}</td>
+          </tr>`).join('');
+
+        // Map markers (demo scatter)
+        markers.forEach(m=>map.removeLayer(m)); markers=[];
+        const uniq = {};
+        alerts.forEach(a=>{ if(a && a.src) uniq[a.src]=1; });
+        Object.keys(uniq).slice(0,120).forEach((ip)=>{
+          const lat = 8 + Math.random()*20;
+          const lon = 68 + Math.random()*20;
+          const marker = L.circleMarker([lat, lon], {radius:5}).addTo(map).bindPopup(ip);
+          markers.push(marker);
+        });
+
+        // Siren switch (uses your MP3 files)
+        setSiren((siren.mode||'safe').toLowerCase());
+
+      }catch(err){ console.error(err); }
+    }
+
+    refresh();
+    setInterval(refresh, 1200);
+  </script>
+</body>
+</html>
